@@ -53,7 +53,7 @@ void MinCutSolver::solveWithBetterBoundAndMultiRandom(int numRandomTries) {
 
     startTimer();
     dfsBetterLB(0); // DFS with improved lower bound
-    stopTimerAndReport("Improved LB + Multi-Random");
+    stopTimerAndReport("");
 }
 
 
@@ -313,17 +313,17 @@ void MinCutSolver::stopTimerAndReport(const char* label) {
 
 void MinCutSolver::printBestSolution() const {
     std::cout << "Best Min-Cut Weight Found: " << minCutWeight << "\n";
-    std::cout << "Partition:\nX: ";
-    for (int i = 0; i < n; i++) {
-        if (bestPartition[i]) {
-            std::cout << i << " ";
-        }
-    }
-    std::cout << "\nY: ";
-    for (int i = 0; i < n; i++) {
-        if (!bestPartition[i]) {
-            std::cout << i << " ";
-        }
-    }
+    // std::cout << "Partition:\nX: ";
+    // for (int i = 0; i < n; i++) {
+    //     if (bestPartition[i]) {
+    //         std::cout << i << " ";
+    //     }
+    // }
+    // std::cout << "\nY: ";
+    // for (int i = 0; i < n; i++) {
+    //     if (!bestPartition[i]) {
+    //         std::cout << i << " ";
+    //     }
+    // }
     std::cout << "\n";
 }

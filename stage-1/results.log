@@ -1,0 +1,163 @@
+Running mincut on all graph files...
+===================================
+Processing ../graphs-dataset/graf_10_5.txt with a=5...
+:
+  Execution Time: 6.1615e-05 seconds
+  Total Recursive Calls: 184
+
+Best Min-Cut Weight Found: 974
+
+-----------------------------------
+Processing ../graphs-dataset/graf_10_6b.txt with a=5...
+:
+  Execution Time: 0.000113401 seconds
+  Total Recursive Calls: 193
+
+Best Min-Cut Weight Found: 1300
+
+-----------------------------------
+Processing ../graphs-dataset/graf_10_7.txt with a=5...
+:
+  Execution Time: 0.000139209 seconds
+  Total Recursive Calls: 262
+
+Best Min-Cut Weight Found: 1593
+
+-----------------------------------
+Processing ../graphs-dataset/graf_15_14.txt with a=5...
+:
+  Execution Time: 0.00299805 seconds
+  Total Recursive Calls: 6019
+
+Best Min-Cut Weight Found: 4963
+
+-----------------------------------
+Processing ../graphs-dataset/graf_20_7.txt with a=7...
+:
+  Execution Time: 0.00634518 seconds
+  Total Recursive Calls: 10340
+
+Best Min-Cut Weight Found: 2110
+
+-----------------------------------
+Processing ../graphs-dataset/graf_20_7.txt with a=10...
+:
+  Execution Time: 0.0120968 seconds
+  Total Recursive Calls: 10500
+
+Best Min-Cut Weight Found: 2378
+
+-----------------------------------
+Processing ../graphs-dataset/graf_20_12.txt with a=10...
+:
+  Execution Time: 0.0247563 seconds
+  Total Recursive Calls: 39328
+
+Best Min-Cut Weight Found: 5060
+
+-----------------------------------
+Processing ../graphs-dataset/graf_20_17.txt with a=10...
+:
+  Execution Time: 0.0486986 seconds
+  Total Recursive Calls: 86411
+
+Best Min-Cut Weight Found: 7995
+
+-----------------------------------
+Processing ../graphs-dataset/graf_30_10.txt with a=10...
+:
+  Execution Time: 0.893069 seconds
+  Total Recursive Calls: 965561
+
+Best Min-Cut Weight Found: 4636
+
+-----------------------------------
+Processing ../graphs-dataset/graf_30_10.txt with a=15...
+:
+  Execution Time: 0.908466 seconds
+  Total Recursive Calls: 734055
+
+Best Min-Cut Weight Found: 5349
+
+-----------------------------------
+Processing ../graphs-dataset/graf_30_20.txt with a=15...
+:
+  Execution Time: 7.04449 seconds
+  Total Recursive Calls: 6654024
+
+Best Min-Cut Weight Found: 13159
+
+-----------------------------------
+Processing ../graphs-dataset/graf_32_22.txt with a=10...
+:
+  Execution Time: 6.09043 seconds
+  Total Recursive Calls: 10752918
+
+Best Min-Cut Weight Found: 13707
+
+-----------------------------------
+Processing ../graphs-dataset/graf_32_25.txt with a=12...
+:
+  Execution Time: 20.4288 seconds
+  Total Recursive Calls: 39466809
+
+Best Min-Cut Weight Found: 18114
+
+-----------------------------------
+Processing ../graphs-dataset/graf_35_25.txt with a=12...
+:
+  Execution Time: 73.7575 seconds
+  Total Recursive Calls: 133293687
+
+Best Min-Cut Weight Found: 18711
+
+-----------------------------------
+Processing ../graphs-dataset/graf_35_25.txt with a=17...
+:
+  Execution Time: 109.986 seconds
+  Total Recursive Calls: 147857180
+
+Best Min-Cut Weight Found: 21163
+
+-----------------------------------
+Processing ../graphs-dataset/graf_40_8.txt with a=15...
+:
+  Execution Time: 16.6058 seconds
+  Total Recursive Calls: 15711329
+
+Best Min-Cut Weight Found: 4256
+
+-----------------------------------
+Processing ../graphs-dataset/graf_40_8.txt with a=20...
+:
+  Execution Time: 19.2872 seconds
+  Total Recursive Calls: 15374678
+
+Best Min-Cut Weight Found: 4829
+
+-----------------------------------
+Processing ../graphs-dataset/graf_40_15.txt with a=15...
+:
+  Execution Time: 261.869 seconds
+  Total Recursive Calls: 308323279
+
+Best Min-Cut Weight Found: 10098
+
+-----------------------------------
+Processing ../graphs-dataset/graf_40_15.txt with a=20...
+:
+  Execution Time: 315.421 seconds
+  Total Recursive Calls: 297278539
+
+Best Min-Cut Weight Found: 11361
+
+-----------------------------------
+Processing ../graphs-dataset/graf_40_25.txt with a=20...
+:
+  Execution Time: 776.764 seconds
+  Total Recursive Calls: 795693894
+
+Best Min-Cut Weight Found: 21697
+
+-----------------------------------
+WARNING: File ../graphs-dataset/ not found, skipping...
