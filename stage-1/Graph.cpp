@@ -34,6 +34,5 @@ Graph::Graph(const std::string& filename)
 
 int Graph::getEdgeWeight(int i, int j) const
 {
-    // Optional: add range checks in debug mode
     return adjacencyMatrix[i][j];
 }
