@@ -1,20 +1,30 @@
 #include "MinCutSolver.h"
 #include <iostream>
-#include <climits>  // For INT_MAX
+#include <climits>
 
 MinCutSolver::MinCutSolver(const Graph& g, int subsetSize)
     : graph(g), n(g.getNumVertices()), a(subsetSize), minCutWeight(INT_MAX),
       assigned(n, false), bestPartition(n, 0),
-      currentCutWeight(0), currentSizeX(0) {}
+      currentCutWeight(0), currentSizeX(0), recursiveCalls(0) {}
 
 void MinCutSolver::solve() {
-    dfs(0);
+    recursiveCalls = 0;
+    startTime = std::chrono::high_resolution_clock::now();  // Time Start 
+
+    dfs(0);  // Start DFS
+
+    auto endTime = std::chrono::high_resolution_clock::now();  // Time Stop
+    std::chrono::duration<double> elapsed = endTime - startTime;
+
+    std::cout << "Execution Time: " << elapsed.count() << " seconds\n";
+    std::cout << "Total Recursive Calls: " << recursiveCalls << "\n";
 }
 
 void MinCutSolver::dfs(int node) {
+    recursiveCalls++; 
+
     if (node == n) {
         if (currentSizeX == a) {
-            // Found a valid partition
             if (currentCutWeight < minCutWeight) {
                 minCutWeight = currentCutWeight;
                 bestPartition.assign(assigned.begin(), assigned.end());
@@ -23,19 +33,17 @@ void MinCutSolver::dfs(int node) {
         return;
     }
 
-    // Prune by lower bound estimation
+    // Prune branch if the current cut + lower bound estimate is worse than the best found cut
     if (currentCutWeight + calculateLowerBound(node) >= minCutWeight) return;
 
-    // Assign to X
+    // Try assigning the node to X
     if (currentSizeX < a) {
         assigned[node] = true;
         int oldCutWeight = currentCutWeight;
 
-        // Update cut weight based on new assignment
+        // Update the cut weight for new assignment
         for (int i = 0; i < node; i++) {
-            if (!assigned[i]) {
-                currentCutWeight += graph.getEdgeWeight(i, node);
-            }
+            if (!assigned[i]) currentCutWeight += graph.getEdgeWeight(i, node);
         }
 
         currentSizeX++;
@@ -46,15 +54,13 @@ void MinCutSolver::dfs(int node) {
         currentCutWeight = oldCutWeight;
     }
 
-    // Assign to Y
+    // Try assigning the node to Y
     assigned[node] = false;
     int oldCutWeight = currentCutWeight;
 
-    // Update cut weight based on new assignment
+    // Update the cut weight for new assignment
     for (int i = 0; i < node; i++) {
-        if (assigned[i]) {
-            currentCutWeight += graph.getEdgeWeight(i, node);
-        }
+        if (assigned[i]) currentCutWeight += graph.getEdgeWeight(i, node);
     }
 
     dfs(node + 1);
@@ -76,7 +82,7 @@ int MinCutSolver::calculateLowerBound(int node) const {
             lowerBound += minEdge;
         }
     }
-    return lowerBound / 2;  // Approximate the remaining cut
+    return lowerBound / 2;  // Approximate remaining cut cost
 }
 
 void MinCutSolver::printBestSolution() const {

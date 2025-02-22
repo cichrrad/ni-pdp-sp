@@ -3,11 +3,12 @@
 
 #include "Graph.h"
 #include <vector>
+#include <chrono>  // For measuring execution time
 
 class MinCutSolver {
 public:
     MinCutSolver(const Graph& graph, int subsetSize);
-    
+
     void solve();
     void printBestSolution() const;
 
@@ -19,11 +20,15 @@ private:
     int n;
     int a;
     int minCutWeight;
-    
+
     std::vector<bool> assigned;  // true = X, false = Y
     std::vector<bool> bestPartition;
     int currentCutWeight;
     int currentSizeX;
+
+    // Performance tracking
+    int recursiveCalls;
+    std::chrono::high_resolution_clock::time_point startTime;
 };
 
 #endif // MINCUTSOLVER_H

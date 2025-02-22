@@ -1,6 +1,7 @@
 #include "Graph.h"
 #include "MinCutSolver.h"
 #include <iostream>
+#include <cstdlib> 
 
 int main(int argc, char* argv[]) {
     if (argc < 3) {
@@ -17,6 +18,7 @@ int main(int argc, char* argv[]) {
         
         solver.solve();
         solver.printBestSolution();
+        
     } catch (const std::exception& e) {
         std::cerr << "ERROR: " << e.what() << std::endl;
         return 1;
@@ -24,3 +26,4 @@ int main(int argc, char* argv[]) {
 
     return 0;
 }
+
