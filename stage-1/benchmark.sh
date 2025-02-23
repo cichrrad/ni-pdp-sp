@@ -1,28 +1,42 @@
 #!/bin/bash
 
 # Ensure correct usage
-if [ "$#" -ne 1 ]; then
-    echo "Usage: $0 <graph_list.txt>"
+if [ "$#" -ne 2 ]; then
+    echo "Usage: $0 <graph_list.txt> <graph_source_dir>"
     exit 1
 fi
 
 GRAPH_LIST="$1"
-LOG_FILE="results.log"
+SOURCE_DIR="$2"
+CSV_FILE="results2.csv"
 
-# Clear log file before starting
-echo "Running mincut on all graph files..." > "$LOG_FILE"
-echo "===================================" >> "$LOG_FILE"
+# Clear CSV file and write the header
+echo "filename,partition_size,recursive_calls,time,min_cut_weight" > "$CSV_FILE"
 
-# Read each line of the input file
+# Read each line from the input file
 while read -r FILENAME SIZE; do
-    if [ -f "../graphs-dataset/${FILENAME}" ]; then
-        echo "Processing ../graphs-dataset/${FILENAME} with a=$SIZE..." | tee -a "$LOG_FILE"
-        ./build/mincut "../graphs-dataset/${FILENAME}" "$SIZE" >> "$LOG_FILE" 2>&1
-        echo "-----------------------------------" >> "$LOG_FILE"
+    GRAPH_PATH="${SOURCE_DIR}/${FILENAME}"
+
+    if [ -f "$GRAPH_PATH" ]; then
+        echo "Processing $FILENAME with a=$SIZE..."
+
+        # Run mincut and capture output
+        OUTPUT=$(./build/mincut "$GRAPH_PATH" "$SIZE")
+
+        # Extract relevant information
+        RECURSIVE_CALLS=$(echo "$OUTPUT" | grep "Total Recursive Calls" | awk '{print $4}')
+        TIME=$(echo "$OUTPUT" | grep "Execution Time" | awk '{print $3}')
+        MIN_CUT_WEIGHT=$(echo "$OUTPUT" | grep "Best Min-Cut Weight Found" | awk '{print $5}')
+
+        # Ensure values exist before writing to CSV
+        if [[ -n "$RECURSIVE_CALLS" && -n "$TIME" && -n "$MIN_CUT_WEIGHT" ]]; then
+            echo "$FILENAME,$SIZE,$RECURSIVE_CALLS,$TIME,$MIN_CUT_WEIGHT" >> "$CSV_FILE"
+        else
+            echo "WARNING: Could not extract values for $FILENAME" | tee -a "$CSV_FILE"
+        fi
     else
-        echo "WARNING: File ../graphs-dataset/${FILENAME} not found, skipping..." | tee -a "$LOG_FILE"
+        echo "WARNING: File $GRAPH_PATH not found, skipping..."
     fi
 done < "$GRAPH_LIST"
 
-echo "Processing complete. Results saved to $LOG_FILE."
-
+echo "Processing complete. Results saved to $CSV_FILE."

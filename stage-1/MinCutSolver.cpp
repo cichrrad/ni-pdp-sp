@@ -304,7 +304,7 @@ void MinCutSolver::stopTimerAndReport(const char* label) {
     auto endTime = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = endTime - startTime;
 
-    std::cout << label << ":\n";
+    std::cout << label << "\n";
     std::cout << "  Execution Time: " << elapsed.count() << " seconds\n";
     std::cout << "  Total Recursive Calls: " << recursiveCalls << "\n\n";
 }
@@ -312,7 +312,7 @@ void MinCutSolver::stopTimerAndReport(const char* label) {
 
 
 void MinCutSolver::printBestSolution() const {
-    std::cout << "Best Min-Cut Weight Found: " << minCutWeight << "\n";
+    std::cout << "  Best Min-Cut Weight Found: " << minCutWeight << "\n";
     // std::cout << "Partition:\nX: ";
     // for (int i = 0; i < n; i++) {
     //     if (bestPartition[i]) {
