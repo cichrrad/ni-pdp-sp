@@ -8,4 +8,4 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 # Add executable
 add_executable(mincut main.cpp Graph.cpp MinCutSolver.cpp)
 
-target_compile_options(mincut PRIVATE -Wall -Wextra -Wpedantic -O2)
+target_compile_options(mincut PRIVATE -Wall -Wextra -Wpedantic -Ofast)
