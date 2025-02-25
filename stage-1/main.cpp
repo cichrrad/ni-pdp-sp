@@ -20,7 +20,7 @@ int main(int argc, char *argv[]) {
     // solver.printBestSolution();
 
     // improved version
-    solver.solveWithBetterBoundAndMultiRandom(20);
+    solver.betterSolve(20);
     solver.printBestSolution();
 
   } catch (const std::exception &e) {

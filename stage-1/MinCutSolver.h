@@ -13,7 +13,7 @@ public:
   void solve();
 
   // improved
-  void solveWithBetterBoundAndMultiRandom(int numRandomTries = 10);
+  void betterSolve(int numRandomTries = 10);
 
   void printBestSolution() const;
 
@@ -22,15 +22,15 @@ private:
   void dfs(int node);
 
   // DFS that uses an improved lower bound
-  void dfsBetterLB(int node);
+  void betterDfs(int node);
 
   // Heuristic: multiple random feasible assignments
-  void initMultipleRandomSolutions(int numTries);
+  void guesstimate(int numTries);
 
-  int improvedLowerBound(int startNode) const;
+  int betterLowerBound(int startNode) const;
 
   // deprecated
-  int naiveLowerBound(int startNode) const;
+  int LowerBound(int startNode) const;
 
   // Helper: compute cut for a full assignment
   int computeCut(const std::vector<bool> &assignment) const;

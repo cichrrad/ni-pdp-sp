@@ -26,7 +26,7 @@ void MinCutSolver::solve() {
 }
 
 // solve with multiple random solutions + improved LB
-void MinCutSolver::solveWithBetterBoundAndMultiRandom(int numRandomTries) {
+void MinCutSolver::betterSolve(int numRandomTries) {
   minCutWeight = INT_MAX;
   std::fill(assigned.begin(), assigned.end(), false);
   std::fill(bestPartition.begin(), bestPartition.end(), false);
@@ -35,7 +35,7 @@ void MinCutSolver::solveWithBetterBoundAndMultiRandom(int numRandomTries) {
   recursiveCalls = 0;
 
   // 1) Get a good initial solution via multiple random tries
-  initMultipleRandomSolutions(numRandomTries);
+  guesstimate(numRandomTries);
 
   // 2) Now do a DFS that uses the improved LB
   std::fill(assigned.begin(), assigned.end(), false);
@@ -43,7 +43,7 @@ void MinCutSolver::solveWithBetterBoundAndMultiRandom(int numRandomTries) {
   currentSizeX = 0;
 
   startTimer();
-  dfsBetterLB(0); // DFS with improved lower bound
+  betterDfs(0); // DFS with improved lower bound
   stopTimerAndReport("");
 }
 
@@ -62,7 +62,7 @@ void MinCutSolver::dfs(int node) {
     return;
   }
 
-  if (currentCutWeight + naiveLowerBound(node) >= minCutWeight) {
+  if (currentCutWeight + LowerBound(node) >= minCutWeight) {
     return;
   }
 
@@ -103,7 +103,7 @@ void MinCutSolver::dfs(int node) {
 }
 
 // BB-DFS with the better lower bound estimate
-void MinCutSolver::dfsBetterLB(int node) {
+void MinCutSolver::betterDfs(int node) {
   recursiveCalls++;
 
   // Base case
@@ -119,7 +119,7 @@ void MinCutSolver::dfsBetterLB(int node) {
   }
 
   // If partial solution is already worse than best, prune
-  int lb = improvedLowerBound(node);
+  int lb = betterLowerBound(node);
   if (currentCutWeight + lb >= minCutWeight) {
     return;
   }
@@ -137,7 +137,7 @@ void MinCutSolver::dfsBetterLB(int node) {
     }
 
     currentSizeX++;
-    dfsBetterLB(node + 1);
+    betterDfs(node + 1);
     currentSizeX--;
     currentCutWeight = oldCut;
   }
@@ -152,7 +152,7 @@ void MinCutSolver::dfsBetterLB(int node) {
     }
   }
 
-  dfsBetterLB(node + 1);
+  betterDfs(node + 1);
 
   // backtrack
   currentCutWeight = oldCut;
@@ -160,7 +160,7 @@ void MinCutSolver::dfsBetterLB(int node) {
 
 // To not start from nothing, try to (gu)es(s)timate initial minCutWeight
 // from [numTries] random configuration
-void MinCutSolver::initMultipleRandomSolutions(int numTries) {
+void MinCutSolver::guesstimate(int numTries) {
   for (int t = 0; t < numTries; t++) {
     // 1) create random assignment
     std::vector<bool> tempAssign(n, false);
@@ -194,7 +194,7 @@ void MinCutSolver::initMultipleRandomSolutions(int numTries) {
 // more accurate LB estimate
 // for each unassigned node i, compute cost if i->X vs. i->Y | sum the MIN over
 // i
-int MinCutSolver::improvedLowerBound(int startNode) const {
+int MinCutSolver::betterLowerBound(int startNode) const {
   int lbSum = 0;
 
   // how many slots remain for X and Y?
@@ -243,7 +243,7 @@ int MinCutSolver::improvedLowerBound(int startNode) const {
 }
 
 // basic lower bound estimate (deprecated)
-int MinCutSolver::naiveLowerBound(int startNode) const {
+int MinCutSolver::LowerBound(int startNode) const {
   int lowerBound = 0;
   for (int i = startNode; i < n; i++) {
     int minEdge = INT_MAX;
