@@ -9,12 +9,10 @@ class MinCutSolver {
 public:
     MinCutSolver(const Graph& graph, int subsetSize);
 
-    // Original, simpler approach
+    // 'naive' deprecated approach
     void solve();
 
-    // Extended approach with:
-    // - multiple random initial solutions
-    // - improved lower bound
+    // improved
     void solveWithBetterBoundAndMultiRandom(int numRandomTries = 10);
 
     void printBestSolution() const;
@@ -44,14 +42,14 @@ private:
 
 private:
     const Graph& graph;
-    int n;  // number of vertices
-    int a;  // required size of subset X
+    int n;  // size (vertices)
+    int a;  // ratio of partitions 
 
     int minCutWeight;
-    std::vector<bool> assigned;      // partial assignment (true = X, false = Y)
-    std::vector<bool> bestPartition; // store best partition found
-    int currentCutWeight;            // cost of partial assignment
-    int currentSizeX;                // how many assigned to X so far
+    std::vector<bool> assigned;      // partial solution (X..1 | Y..0)
+    std::vector<bool> bestPartition; // duh
+    int currentCutWeight;            // duh
+    int currentSizeX;                // duh
 
     // Perf
     int recursiveCalls;

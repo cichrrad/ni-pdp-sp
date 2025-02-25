@@ -10,16 +10,16 @@ Graph::Graph(const std::string& filename)
         throw std::runtime_error("Could not open file " + filename);
     }
 
-    // First line: number of vertices
+    // expects n on first line
     fin >> n;
     if (n <= 0) {
         throw std::runtime_error("Invalid number of vertices in file " + filename);
     }
 
-    // Initialize adjacency matrix (n x n) with zeros
+    // adj matrix init
     adjacencyMatrix.resize(n, std::vector<int>(n, 0));
 
-    // Read the adjacency matrix rows
+    // parse
     for (int i = 0; i < n; ++i) {
         for (int j = 0; j < n; ++j) {
             fin >> adjacencyMatrix[i][j];

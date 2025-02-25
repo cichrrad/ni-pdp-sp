@@ -15,11 +15,11 @@ int main(int argc, char* argv[]) {
         Graph g(filename);
         MinCutSolver solver(g, subsetSize);
 
-        // 1) Run the original approach
+        // 'naive' (deprecated) solver
         //solver.solve();
         //solver.printBestSolution();
 
-        // 2) Run improved approach: multiple random solutions + better LB
+        // improved version
         solver.solveWithBetterBoundAndMultiRandom(20);
         solver.printBestSolution();
 
