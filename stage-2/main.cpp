@@ -15,12 +15,8 @@ int main(int argc, char *argv[]) {
     Graph g(filename);
     MinCutSolver solver(g, subsetSize);
 
-    // 'naive' (deprecated) solver
-    // solver.solve();
-    // solver.printBestSolution();
-
-    // improved version
-    solver.solveWithBetterBoundAndMultiRandom(20);
+    // Example: run parallel solver with 20 random inits, cutoffDepth=4
+    solver.solveParallelOMP(20, 4);
     solver.printBestSolution();
 
   } catch (const std::exception &e) {

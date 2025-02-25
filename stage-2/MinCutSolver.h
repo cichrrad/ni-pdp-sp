@@ -16,6 +16,7 @@ public:
   void solveWithBetterBoundAndMultiRandom(int numRandomTries = 10);
 
   void printBestSolution() const;
+  void solveParallelOMP(int numRandomTries, int cutoffDepth = 4);
 
 private:
   // deprecated
@@ -23,6 +24,9 @@ private:
 
   // DFS that uses an improved lower bound
   void dfsBetterLB(int node);
+
+  void dfsBetterLB_omp(int node, int currentCut, int sizeX,
+                       std::vector<bool> assign, int depth, int cutoffDepth);
 
   // Heuristic: multiple random feasible assignments
   void initMultipleRandomSolutions(int numTries);
