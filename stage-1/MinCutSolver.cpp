@@ -21,8 +21,8 @@ void MinCutSolver::solve() {
   recursiveCalls = 0;
 
   startTimer();
-  dfs(0); // original DFS
-  stopTimerAndReport("Original DFS");
+  dfs(0); // plain DFS
+  stopTimer("plain DFS");
 }
 
 // solve with multiple random solutions + improved LB
@@ -36,15 +36,14 @@ void MinCutSolver::betterSolve(int numRandomTries) {
 
   // 1) Get a good initial solution via multiple random tries
   guesstimate(numRandomTries);
-
-  // 2) Now do a DFS that uses the improved LB
-  std::fill(assigned.begin(), assigned.end(), false);
-  currentCutWeight = 0;
-  currentSizeX = 0;
+  //  std::cout << "initial guesstimated mincutw:" << minCutWeight << "\n";
+  //  std::fill(assigned.begin(), assigned.end(), false);
+  //  currentCutWeight = 0;
+  //  currentSizeX = 0;
 
   startTimer();
   betterDfs(0); // DFS with improved lower bound
-  stopTimerAndReport("");
+  stopTimer("");
 }
 
 // BB-DFS with basic lower bound estimate (deprecated)
@@ -229,10 +228,8 @@ int MinCutSolver::betterLowerBound(int startNode) const {
     }
 
     int best = (costX < costY) ? costX : costY;
+    // if both are already assigned
     if (best == INT_MAX) {
-      // This means we can't put i in X or Y feasibly -> the branch is basically
-      // infeasible But for bounding, let's just say 0 because that path won't
-      // lead to a valid solution anyway.
       best = 0;
     }
 
@@ -279,7 +276,7 @@ void MinCutSolver::startTimer() {
   startTime = std::chrono::high_resolution_clock::now();
 }
 
-void MinCutSolver::stopTimerAndReport(const char *label) {
+void MinCutSolver::stopTimer(const char *label) {
   auto endTime = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double> elapsed = endTime - startTime;
 

@@ -37,7 +37,7 @@ private:
 
   // Performance trackers
   void startTimer();
-  void stopTimerAndReport(const char *label);
+  void stopTimer(const char *label);
 
 private:
   const Graph &graph;

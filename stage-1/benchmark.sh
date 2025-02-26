@@ -8,7 +8,7 @@ fi
 
 GRAPH_LIST="$1"
 SOURCE_DIR="$2"
-CSV_FILE="results_ofast.csv"
+CSV_FILE="results_reduced_guesstimate.csv"
 
 # Clear CSV file and write the header
 echo "filename,partition_size,recursive_calls,time,min_cut_weight" > "$CSV_FILE"
