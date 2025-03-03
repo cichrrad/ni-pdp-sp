@@ -5,6 +5,14 @@
 #include <chrono>
 #include <vector>
 
+// Define a structure to hold a DFS state.
+struct State {
+  int node;
+  int currentSizeX;
+  int currentCutWeight;
+  std::vector<bool> assigned;
+};
+
 class MinCutSolver {
 public:
   MinCutSolver(const Graph &graph, int subsetSize);
@@ -12,36 +20,38 @@ public:
   // 'naive' deprecated approach
   void solve();
 
+  int betterLowerBoundState(const State &s, int startNode) const;
+
   // improved
-  void solveWithBetterBoundAndMultiRandom(int numRandomTries = 10);
+  void betterSolve(int numRandomTries = 10);
+
+  int improvedLowerBound(const State &s, int startNode) const;
 
   void printBestSolution() const;
-  void solveParallelOMP(int numRandomTries, int cutoffDepth = 4);
 
 private:
   // deprecated
   void dfs(int node);
 
   // DFS that uses an improved lower bound
-  void dfsBetterLB(int node);
-
-  void dfsBetterLB_omp(int node, int currentCut, int sizeX,
-                       std::vector<bool> assign, int depth, int cutoffDepth);
+  void betterDfs(int node);
 
   // Heuristic: multiple random feasible assignments
-  void initMultipleRandomSolutions(int numTries);
+  void guesstimate(int numTries);
 
-  int improvedLowerBound(int startNode) const;
+  int betterLowerBound(int startNode) const;
 
   // deprecated
-  int naiveLowerBound(int startNode) const;
+  int LowerBound(int startNode) const;
 
   // Helper: compute cut for a full assignment
   int computeCut(const std::vector<bool> &assignment) const;
 
   // Performance trackers
   void startTimer();
-  void stopTimerAndReport(const char *label);
+  void stopTimer(const char *label);
+
+  void processState(State s);
 
 private:
   const Graph &graph;

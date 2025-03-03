@@ -3,13 +3,9 @@
 #include <cstdlib>
 #include <ctime>
 #include <iostream>
-#include <omp.h> // ADD THIS
+#include <omp.h>
+#include <queue>
 
-// We'll use a mutex or critical sections to update shared data:
-#pragma omp declare reduction(min_int                                          \
-:int : omp_out = std::min(omp_out, omp_in)) initializer(omp_priv = INT_MAX)
-
-// constructor unchanged
 MinCutSolver::MinCutSolver(const Graph &g, int subsetSize)
     : graph(g), n(g.getNumVertices()), a(subsetSize), minCutWeight(INT_MAX),
       assigned(n, false), bestPartition(n, false), currentCutWeight(0),
@@ -17,80 +13,303 @@ MinCutSolver::MinCutSolver(const Graph &g, int subsetSize)
   std::srand((unsigned)std::time(nullptr));
 }
 
-// -----------------------------------------------------------------------
-// Example new method that does parallel DFS with OpenMP tasks
-// -----------------------------------------------------------------------
-void MinCutSolver::solveParallelOMP(int numRandomTries, int cutoffDepth) {
-  // 1) As before, get a good initial solution
+// basic solve (deprecated)
+void MinCutSolver::solve() {
   minCutWeight = INT_MAX;
-  recursiveCalls = 0;
-  initMultipleRandomSolutions(numRandomTries);
-
-  // 2) Now run parallel version of DFS with tasks
   std::fill(assigned.begin(), assigned.end(), false);
+  std::fill(bestPartition.begin(), bestPartition.end(), false);
   currentCutWeight = 0;
   currentSizeX = 0;
+  recursiveCalls = 0;
+
+  startTimer();
+  dfs(0); // plain DFS
+  stopTimer("plain DFS");
+}
+
+// solve with multiple random solutions + improved LB using master-slave
+// parallelism
+void MinCutSolver::betterSolve(int numRandomTries) {
+  minCutWeight = INT_MAX;
+  std::fill(assigned.begin(), assigned.end(), false);
+  std::fill(bestPartition.begin(), bestPartition.end(), false);
+  currentCutWeight = 0;
+  currentSizeX = 0;
+  recursiveCalls = 0;
+
+  // 1) Get a good initial solution via multiple random tries.
+  guesstimate(numRandomTries);
 
   startTimer();
 
-// We'll run the parallel region around a single "master" invocation
-// that spawns tasks
-#pragma omp parallel
-  {
-// Only one thread enters "single"
-#pragma omp single
-    {
-      // pass partial state by value/copy
-      dfsBetterLB_omp(0, /* currentCut = */ 0,
-                      /* sizeX = */ 0, assigned, /* copy of assigned vector */
-                      /* depth= */ 0, cutoffDepth);
+  // 2) Build an initial task queue using the master thread.
+  // We'll expand the DFS tree to a fixed depth D.
+  const int D = 4;
+  std::queue<State> taskQueue;
+  // Create the initial state.
+  State init;
+  init.node = 0;
+  init.currentSizeX = 0;
+  init.currentCutWeight = 0;
+  init.assigned = std::vector<bool>(n, false);
+  taskQueue.push(init);
+
+  // Expand states until reaching depth D.
+  std::queue<State> initialTasks;
+  while (!taskQueue.empty()) {
+    State s = taskQueue.front();
+    taskQueue.pop();
+    if (s.node < D) {
+      // Branch: assign node -> X if feasible.
+      if (s.currentSizeX < a) {
+        State s1 = s;
+        s1.assigned[s.node] = true;
+        for (int i = 0; i < s.node; i++) {
+          if (!s1.assigned[i]) {
+            s1.currentCutWeight += graph.getEdgeWeight(i, s.node);
+          }
+        }
+        s1.currentSizeX++;
+        s1.node = s.node + 1;
+        taskQueue.push(s1);
+      }
+      // Branch: assign node -> Y.
+      State s2 = s;
+      s2.assigned[s.node] = false;
+      for (int i = 0; i < s.node; i++) {
+        if (s2.assigned[i]) {
+          s2.currentCutWeight += graph.getEdgeWeight(i, s.node);
+        }
+      }
+      s2.node = s.node + 1;
+      taskQueue.push(s2);
+    } else {
+      // Once depth D is reached, add the state to the initial tasks.
+      initialTasks.push(s);
     }
   }
 
-  stopTimerAndReport("Parallel OMP DFS");
+// 3) Process tasks in parallel (slave workers).
+#pragma omp parallel
+  {
+    while (true) {
+      State currentTask;
+      bool gotTask = false;
+// Critical section to safely pop a task.
+#pragma omp critical
+      {
+        if (!initialTasks.empty()) {
+          currentTask = initialTasks.front();
+          initialTasks.pop();
+          gotTask = true;
+        }
+      }
+      if (!gotTask)
+        break; // No more tasks: exit loop.
+      processState(currentTask);
+    }
+  }
+
+  stopTimer("");
 }
 
-void MinCutSolver::printBestSolution() const {
-  std::cout << "  Best Min-Cut Weight Found: " << minCutWeight << "\n";
-  // std::cout << "Partition:\nX: ";
-  // for (int i = 0; i < n; i++) {
-  //     if (bestPartition[i]) {
-  //         std::cout << i << " ";
-  //     }
-  // }
-  // std::cout << "\nY: ";
-  // for (int i = 0; i < n; i++) {
-  //     if (!bestPartition[i]) {
-  //         std::cout << i << " ";
-  //     }
-  // }
-  std::cout << "\n";
+// Sequential DFS with improved lower bound that processes a given state.
+void MinCutSolver::processState(State s) {
+// Update global recursive call count atomically.
+#pragma omp atomic
+  recursiveCalls++;
+
+  // Base case: if we've assigned all nodes.
+  if (s.node == n) {
+    if (s.currentSizeX == a) {
+// Update global best if a better cut is found.
+#pragma omp critical
+      {
+        if (s.currentCutWeight < minCutWeight) {
+          minCutWeight = s.currentCutWeight;
+          bestPartition = s.assigned;
+        }
+      }
+    }
+    return;
+  }
+
+  // Compute a lower bound for the current partial solution.
+  int lb = betterLowerBoundState(s, s.node);
+  if (s.currentCutWeight + lb >= minCutWeight)
+    return;
+
+  // Branch 1: assign node -> X if feasible.
+  if (s.currentSizeX < a) {
+    State s1 = s; // Copy current state.
+    s1.assigned[s.node] = true;
+    for (int i = 0; i < s.node; i++) {
+      if (!s1.assigned[i]) {
+        s1.currentCutWeight += graph.getEdgeWeight(i, s.node);
+      }
+    }
+    s1.currentSizeX++;
+    s1.node = s.node + 1;
+    processState(s1);
+  }
+
+  // Branch 2: assign node -> Y.
+  State s2 = s; // Copy current state.
+  s2.assigned[s.node] = false;
+  for (int i = 0; i < s.node; i++) {
+    if (s2.assigned[i]) {
+      s2.currentCutWeight += graph.getEdgeWeight(i, s.node);
+    }
+  }
+  s2.node = s.node + 1;
+  processState(s2);
 }
 
-void MinCutSolver::initMultipleRandomSolutions(int numTries) {
+// Helper: state-based version of betterLowerBound.
+// It works like the original betterLowerBound but uses a State.
+int MinCutSolver::betterLowerBoundState(const State &s, int startNode) const {
+  int lbSum = 0;
+  int remainX = a - s.currentSizeX;
+  int remainY = (n - a) - ((startNode)-s.currentSizeX);
+
+  for (int i = startNode; i < n; i++) {
+    int costX = 0;
+    int costY = 0;
+    if (remainX > 0) {
+      for (int j = 0; j < i; j++) {
+        if (!s.assigned[j]) {
+          costX += graph.getEdgeWeight(i, j);
+        }
+      }
+    } else {
+      costX = INT_MAX;
+    }
+    if (remainY > 0) {
+      for (int j = 0; j < i; j++) {
+        if (s.assigned[j]) {
+          costY += graph.getEdgeWeight(i, j);
+        }
+      }
+    } else {
+      costY = INT_MAX;
+    }
+    int best = (costX < costY) ? costX : costY;
+    if (best == INT_MAX) {
+      best = 0;
+    }
+    lbSum += best;
+  }
+  return lbSum;
+}
+
+// BB-DFS with basic lower bound estimate (deprecated)
+void MinCutSolver::dfs(int node) {
+  recursiveCalls++;
+
+  // Base case.
+  if (node == n) {
+    if (currentSizeX == a) {
+      if (currentCutWeight < minCutWeight) {
+        minCutWeight = currentCutWeight;
+        bestPartition.assign(assigned.begin(), assigned.end());
+      }
+    }
+    return;
+  }
+
+  if (currentCutWeight + LowerBound(node) >= minCutWeight) {
+    return;
+  }
+
+  // If putting node in X is feasible.
+  if (currentSizeX < a) {
+    assigned[node] = true;
+    int oldCut = currentCutWeight;
+    for (int i = 0; i < node; i++) {
+      if (!assigned[i]) {
+        currentCutWeight += graph.getEdgeWeight(i, node);
+      }
+    }
+    currentSizeX++;
+    dfs(node + 1);
+    currentSizeX--;
+    currentCutWeight = oldCut;
+  }
+
+  // Try node -> Y.
+  assigned[node] = false;
+  int oldCut = currentCutWeight;
+  for (int i = 0; i < node; i++) {
+    if (assigned[i]) {
+      currentCutWeight += graph.getEdgeWeight(i, node);
+    }
+  }
+  dfs(node + 1);
+  currentCutWeight = oldCut;
+}
+
+// BB-DFS with the better lower bound estimate (sequential version, deprecated
+// by master-slave model)
+void MinCutSolver::betterDfs(int node) {
+  recursiveCalls++;
+
+  if (node == n) {
+    if (currentSizeX == a) {
+      if (currentCutWeight < minCutWeight) {
+        minCutWeight = currentCutWeight;
+        bestPartition.assign(assigned.begin(), assigned.end());
+      }
+    }
+    return;
+  }
+
+  int lb = betterLowerBound(node);
+  if (currentCutWeight + lb >= minCutWeight) {
+    return;
+  }
+
+  if (currentSizeX < a) {
+    assigned[node] = true;
+    int oldCut = currentCutWeight;
+    for (int i = 0; i < node; i++) {
+      if (!assigned[i]) {
+        currentCutWeight += graph.getEdgeWeight(i, node);
+      }
+    }
+    currentSizeX++;
+    betterDfs(node + 1);
+    currentSizeX--;
+    currentCutWeight = oldCut;
+  }
+
+  assigned[node] = false;
+  int oldCut2 = currentCutWeight;
+  for (int i = 0; i < node; i++) {
+    if (assigned[i]) {
+      currentCutWeight += graph.getEdgeWeight(i, node);
+    }
+  }
+  betterDfs(node + 1);
+  currentCutWeight = oldCut2;
+}
+
+// To not start from nothing, try to (gu)es(s)timate initial minCutWeight
+// from [numTries] random configurations.
+void MinCutSolver::guesstimate(int numTries) {
   for (int t = 0; t < numTries; t++) {
-    // 1) create random assignment
     std::vector<bool> tempAssign(n, false);
-
-    // pick 'a' distinct vertices for X
     std::vector<int> perm(n);
     for (int i = 0; i < n; i++) {
       perm[i] = i;
     }
-    // shuffle
     for (int i = 0; i < n; i++) {
       int r = i + std::rand() % (n - i);
       std::swap(perm[i], perm[r]);
     }
-    // first 'a' -> X
     for (int i = 0; i < a; i++) {
       tempAssign[perm[i]] = true;
     }
-
-    // 2) compute cut
     int cutVal = computeCut(tempAssign);
-
-    // 3) update best global solution if better
     if (cutVal < minCutWeight) {
       minCutWeight = cutVal;
       bestPartition = tempAssign;
@@ -98,67 +317,64 @@ void MinCutSolver::initMultipleRandomSolutions(int numTries) {
   }
 }
 
-void MinCutSolver::startTimer() {
-  startTime = std::chrono::high_resolution_clock::now();
-}
-
-int MinCutSolver::improvedLowerBound(int startNode) const {
+// More accurate LB estimate: for each unassigned node i, compute cost if i->X
+// vs. i->Y.
+int MinCutSolver::betterLowerBound(int startNode) const {
   int lbSum = 0;
-
-  // how many slots remain for X and Y?
   int remainX = a - currentSizeX;
   int remainY = (n - a) - ((startNode)-currentSizeX);
 
   for (int i = startNode; i < n; i++) {
-
     int costX = 0;
     int costY = 0;
-
     if (remainX > 0) {
-
       for (int j = 0; j < i; j++) {
-        if (assigned[j] == false) { // j is in Y
+        if (assigned[j] == false) {
           costX += graph.getEdgeWeight(i, j);
         }
       }
     } else {
-      costX = INT_MAX; // can't place i in X
+      costX = INT_MAX;
     }
-
     if (remainY > 0) {
-
       for (int j = 0; j < i; j++) {
-        if (assigned[j] == true) { // j is in X
+        if (assigned[j] == true) {
           costY += graph.getEdgeWeight(i, j);
         }
       }
     } else {
-      costY = INT_MAX; // can't place i in Y
+      costY = INT_MAX;
     }
-
     int best = (costX < costY) ? costX : costY;
     if (best == INT_MAX) {
-      // This means we can't put i in X or Y feasibly -> the branch is basically
-      // infeasible But for bounding, let's just say 0 because that path won't
-      // lead to a valid solution anyway.
       best = 0;
     }
-
     lbSum += best;
   }
 
   return lbSum;
 }
 
-void MinCutSolver::stopTimerAndReport(const char *label) {
-  auto endTime = std::chrono::high_resolution_clock::now();
-  std::chrono::duration<double> elapsed = endTime - startTime;
-
-  std::cout << label << "\n";
-  std::cout << "  Execution Time: " << elapsed.count() << " seconds\n";
-  std::cout << "  Total Recursive Calls: " << recursiveCalls << "\n\n";
+// Basic lower bound estimate (deprecated).
+int MinCutSolver::LowerBound(int startNode) const {
+  int lowerBound = 0;
+  for (int i = startNode; i < n; i++) {
+    int minEdge = INT_MAX;
+    for (int j = 0; j < n; j++) {
+      if (i != j && graph.getEdgeWeight(i, j) > 0) {
+        if (graph.getEdgeWeight(i, j) < minEdge) {
+          minEdge = graph.getEdgeWeight(i, j);
+        }
+      }
+    }
+    if (minEdge != INT_MAX) {
+      lowerBound += minEdge;
+    }
+  }
+  return lowerBound / 2;
 }
 
+// Computes the cut of a given assignment.
 int MinCutSolver::computeCut(const std::vector<bool> &assignment) const {
   int cutVal = 0;
   for (int i = 0; i < n; i++) {
@@ -171,103 +387,20 @@ int MinCutSolver::computeCut(const std::vector<bool> &assignment) const {
   return cutVal;
 }
 
-// This version is similar to dfsBetterLB, but each call can spawn tasks
-// for the next level if depth < cutoffDepth
-void MinCutSolver::dfsBetterLB_omp(int node, int currentCut, int sizeX,
-                                   std::vector<bool> assign, int depth,
-                                   int cutoffDepth) {
-// increment recursion calls atomically
-#pragma omp atomic
-  recursiveCalls++;
+void MinCutSolver::startTimer() {
+  startTime = std::chrono::high_resolution_clock::now();
+}
 
-  // base case
-  if (node == n) {
-    if (sizeX == a) {
-      // potential update of minCutWeight + bestPartition
-      // must be done in a critical section or atomic
-      if (currentCut < minCutWeight) {
-#pragma omp critical
-        {
-          if (currentCut < minCutWeight) {
-            minCutWeight = currentCut;
-            bestPartition = assign;
-          }
-        }
-      }
-    }
-    return;
-  }
+void MinCutSolver::stopTimer(const char *label) {
+  auto endTime = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<double> elapsed = endTime - startTime;
 
-  // bounding
-  int lb = improvedLowerBound(
-      node); // same usage, but watch out for 'assign' usage inside it
-  if (currentCut + lb >= minCutWeight) {
-    return;
-  }
+  std::cout << label << "\n";
+  std::cout << "  Execution Time: " << elapsed.count() << " seconds\n";
+  std::cout << "  Total Recursive Calls: " << recursiveCalls << "\n\n";
+}
 
-  // We'll create up to 2 tasks (one for "node -> X" and one for "node -> Y")
-  // if we haven't hit cutoffDepth, otherwise do sequential calls.
-
-  bool spawnTasks = (depth < cutoffDepth);
-
-  // Try node -> X
-  if (sizeX < a) {
-    // copy partial state for "node -> X"
-    std::vector<bool> assignX = assign;
-    int cutX = currentCut;
-    int sizeX2 = sizeX;
-
-    assignX[node] = true;
-    // update partial cut
-    for (int i = 0; i < node; i++) {
-      if (!assignX[i]) {
-        cutX += graph.getEdgeWeight(i, node);
-      }
-    }
-    sizeX2++;
-
-    if (spawnTasks) {
-#pragma omp task firstprivate(assignX, cutX, sizeX2)                           \
-    shared(minCutWeight, bestPartition)
-      {
-        dfsBetterLB_omp(node + 1, cutX, sizeX2, assignX, depth + 1,
-                        cutoffDepth);
-      }
-    } else {
-      // do sequential call
-      dfsBetterLB_omp(node + 1, cutX, sizeX2, assignX, depth + 1, cutoffDepth);
-    }
-  }
-
-  // Try node -> Y
-  {
-    std::vector<bool> assignY = assign;
-    int cutY = currentCut;
-    int sizeY2 = sizeX; // sizeX remains the same if we put node in Y
-
-    assignY[node] = false;
-    for (int i = 0; i < node; i++) {
-      if (assignY[i]) {
-        cutY += graph.getEdgeWeight(i, node);
-      }
-    }
-
-    if (spawnTasks) {
-#pragma omp task firstprivate(assignY, cutY, sizeY2)                           \
-    shared(minCutWeight, bestPartition)
-      {
-        dfsBetterLB_omp(node + 1, cutY, sizeY2, assignY, depth + 1,
-                        cutoffDepth);
-      }
-    } else {
-      // sequential
-      dfsBetterLB_omp(node + 1, cutY, sizeY2, assignY, depth + 1, cutoffDepth);
-    }
-  }
-
-  // Wait for child tasks at this node to finish before returning
-  // This ensures correctness at each branching level
-  if (spawnTasks) {
-#pragma omp taskwait
-  }
+void MinCutSolver::printBestSolution() const {
+  std::cout << "  Best Min-Cut Weight Found: " << minCutWeight << "\n";
+  std::cout << "\n";
 }
