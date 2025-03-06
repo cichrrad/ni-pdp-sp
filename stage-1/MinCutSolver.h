@@ -9,18 +9,11 @@ class MinCutSolver {
 public:
   MinCutSolver(const Graph &graph, int subsetSize);
 
-  // 'naive' deprecated approach
-  void solve();
-
-  // improved
   void betterSolve(int numRandomTries = 10);
 
   void printBestSolution() const;
 
 private:
-  // deprecated
-  void dfs(int node);
-
   // DFS that uses an improved lower bound
   void betterDfs(int node);
 
@@ -28,9 +21,6 @@ private:
   void guesstimate(int numTries);
 
   int betterLowerBound(int startNode) const;
-
-  // deprecated
-  int LowerBound(int startNode) const;
 
   // Helper: compute cut for a full assignment
   int computeCut(const std::vector<bool> &assignment) const;

@@ -5,68 +5,48 @@
 #include <chrono>
 #include <vector>
 
-// Define a structure to hold a DFS state.
+// Structure to hold DFS state for parallel DFS.
 struct State {
-  int node;
-  int currentSizeX;
-  int currentCutWeight;
-  std::vector<bool> assigned;
+  int node;                   // current node index in DFS
+  int currentSizeX;           // number of nodes assigned to set X so far
+  int currentCutWeight;       // accumulated cut weight
+  std::vector<bool> assigned; // assignment: true if node is in X, false if in Y
 };
 
 class MinCutSolver {
 public:
-  MinCutSolver(const Graph &graph, int subsetSize);
+  MinCutSolver(const Graph &g, int subsetSize);
 
-  // 'naive' deprecated approach
-  void solve();
+  // The improved solver that uses parallel DFS.
+  void betterSolve(int numRandomTries);
 
-  int betterLowerBoundState(const State &s, int startNode) const;
-
-  // improved
-  void betterSolve(int numRandomTries = 10);
-
-  int improvedLowerBound(const State &s, int startNode) const;
-
-  void printBestSolution() const;
-
-private:
-  // deprecated
-  void dfs(int node);
-
-  // DFS that uses an improved lower bound
-  void betterDfs(int node);
-
-  // Heuristic: multiple random feasible assignments
+  // Used to compute an initial good solution.
   void guesstimate(int numTries);
 
-  int betterLowerBound(int startNode) const;
+  // Print the best solution found.
+  void printBestSolution() const;
 
-  // deprecated
-  int LowerBound(int startNode) const;
-
-  // Helper: compute cut for a full assignment
+  // Computes the cut value for a given partition.
   int computeCut(const std::vector<bool> &assignment) const;
-
-  // Performance trackers
-  void startTimer();
-  void stopTimer(const char *label);
-
-  void processState(State s);
 
 private:
   const Graph &graph;
-  int n; // size (vertices)
-  int a; // ratio of partitions
-
+  int n; // number of vertices in the graph
+  int a; // required size for partition X
   int minCutWeight;
-  std::vector<bool> assigned;      // partial solution (X..1 | Y..0)
-  std::vector<bool> bestPartition; // duh
-  int currentCutWeight;            // duh
-  int currentSizeX;                // duh
-
-  // Perf
+  std::vector<bool> assigned;
+  std::vector<bool> bestPartition;
+  int currentCutWeight;
+  int currentSizeX;
   int recursiveCalls;
-  std::chrono::high_resolution_clock::time_point startTime;
+  std::chrono::time_point<std::chrono::high_resolution_clock> startTime;
+
+  // Helper functions for the parallel DFS.
+  int parallelBetterLowerBound(int startNode, const std::vector<bool> &assigned,
+                               int currentSizeX) const;
+  void parallelDfs(State state);
+  void startTimer();
+  void stopTimer(const char *label);
 };
 
 #endif // MINCUTSOLVER_H

@@ -15,11 +15,6 @@ int main(int argc, char *argv[]) {
     Graph g(filename);
     MinCutSolver solver(g, subsetSize);
 
-    //'naive' (deprecated) solver
-    // solver.solve();
-    // solver.printBestSolution();
-
-    // improved version
     solver.betterSolve(1);
     solver.printBestSolution();
 

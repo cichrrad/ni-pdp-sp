@@ -11,20 +11,6 @@ MinCutSolver::MinCutSolver(const Graph &g, int subsetSize)
   std::srand((unsigned)std::time(nullptr));
 }
 
-// basic solve (deprecated)
-void MinCutSolver::solve() {
-  minCutWeight = INT_MAX;
-  std::fill(assigned.begin(), assigned.end(), false);
-  std::fill(bestPartition.begin(), bestPartition.end(), false);
-  currentCutWeight = 0;
-  currentSizeX = 0;
-  recursiveCalls = 0;
-
-  startTimer();
-  dfs(0); // plain DFS
-  stopTimer("plain DFS");
-}
-
 // solve with multiple random solutions + improved LB
 void MinCutSolver::betterSolve(int numRandomTries) {
   minCutWeight = INT_MAX;
@@ -44,61 +30,6 @@ void MinCutSolver::betterSolve(int numRandomTries) {
   startTimer();
   betterDfs(0); // DFS with improved lower bound
   stopTimer("");
-}
-
-// BB-DFS with basic lower bound estimate (deprecated)
-void MinCutSolver::dfs(int node) {
-  recursiveCalls++;
-
-  // Base case
-  if (node == n) {
-    if (currentSizeX == a) {
-      if (currentCutWeight < minCutWeight) {
-        minCutWeight = currentCutWeight;
-        bestPartition.assign(assigned.begin(), assigned.end());
-      }
-    }
-    return;
-  }
-
-  if (currentCutWeight + LowerBound(node) >= minCutWeight) {
-    return;
-  }
-
-  // If putting node in X is feasible
-  if (currentSizeX < a) {
-    assigned[node] = true;
-    int oldCut = currentCutWeight;
-
-    // Update partial cut
-    for (int i = 0; i < node; i++) {
-      if (!assigned[i]) { // crosses partition
-        currentCutWeight += graph.getEdgeWeight(i, node);
-      }
-    }
-
-    currentSizeX++;
-    dfs(node + 1);
-    currentSizeX--;
-
-    // backtrack
-    currentCutWeight = oldCut;
-  }
-
-  // node -> Y
-  assigned[node] = false;
-  int oldCut = currentCutWeight;
-
-  for (int i = 0; i < node; i++) {
-    if (assigned[i]) {
-      currentCutWeight += graph.getEdgeWeight(i, node);
-    }
-  }
-
-  dfs(node + 1);
-
-  // backtrack
-  currentCutWeight = oldCut;
 }
 
 // BB-DFS with the better lower bound estimate
@@ -237,25 +168,6 @@ int MinCutSolver::betterLowerBound(int startNode) const {
   }
 
   return lbSum;
-}
-
-// basic lower bound estimate (deprecated)
-int MinCutSolver::LowerBound(int startNode) const {
-  int lowerBound = 0;
-  for (int i = startNode; i < n; i++) {
-    int minEdge = INT_MAX;
-    for (int j = 0; j < n; j++) {
-      if (i != j && graph.getEdgeWeight(i, j) > 0) {
-        if (graph.getEdgeWeight(i, j) < minEdge) {
-          minEdge = graph.getEdgeWeight(i, j);
-        }
-      }
-    }
-    if (minEdge != INT_MAX) {
-      lowerBound += minEdge;
-    }
-  }
-  return lowerBound / 2;
 }
 
 // computes cut of a given assignment
