@@ -194,25 +194,12 @@ void MinCutSolver::betterSolveParallel(int numRandomTries) {
   for (auto count : recursionCounts) {
     totalRecursionCalls += count;
   }
-  std::cout << "Total Recursion Calls: " << totalRecursionCalls << "\n";
+  std::cout << "  Total Recursion Calls: " << totalRecursionCalls << "\n";
 }
 
 // Print the best solution found.
 void MinCutSolver::printBestSolution() const {
   std::cout << "  Best Min-Cut Weight Found: " << minCutWeight << "\n";
-  // Uncomment below to print partition details.
-  // std::cout << "Partition:\nX: ";
-  // for (int i = 0; i < n; i++) {
-  //     if (bestPartition[i]) {
-  //         std::cout << i << " ";
-  //     }
-  // }
-  // std::cout << "\nY: ";
-  // for (int i = 0; i < n; i++) {
-  //     if (!bestPartition[i]) {
-  //         std::cout << i << " ";
-  //     }
-  // }
   std::cout << "\n";
 }
 
@@ -243,8 +230,6 @@ void MinCutSolver::stopTimer(const char *label) {
 
   std::cout << label << "\n";
   std::cout << "  Execution Time: " << elapsed.count() << " seconds\n";
-  std::cout << "  Total Recursive Calls (sequential counter, if used): "
-            << recursiveCalls << "\n\n";
 }
 
 // To not start from nothing, try to (gu)es(s)timate an initial minCutWeight

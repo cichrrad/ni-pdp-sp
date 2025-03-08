@@ -5,14 +5,6 @@
 #include <chrono>
 #include <vector>
 
-// Structure to hold DFS state for parallel DFS.
-struct State {
-  int node;                   // current node index in DFS
-  int currentSizeX;           // number of nodes assigned to set X so far
-  int currentCutWeight;       // accumulated cut weight
-  std::vector<bool> assigned; // assignment: true if node is in X, false if in Y
-};
-
 class MinCutSolver {
 public:
   MinCutSolver(const Graph &g, int subsetSize);
@@ -26,8 +18,6 @@ public:
   // Print the best solution found.
   void printBestSolution() const;
 
-  // Computes the cut value for a given partition.
-  int computeCut(const std::vector<bool> &assignment) const;
   void betterSolveParallel(int numRandomTries);
 
 private:
@@ -43,12 +33,11 @@ private:
   int recursiveCalls;
   std::chrono::time_point<std::chrono::high_resolution_clock> startTime;
 
-  // Helper functions for the parallel DFS.
-  int parallelBetterLowerBound(int startNode, const std::vector<bool> &assigned,
-                               int currentSizeX) const;
-  void parallelDfs(State state);
+  int computeCut(const std::vector<bool> &assignment) const;
+
   void startTimer();
   void stopTimer(const char *label);
+
   void betterDfsParallel(int node, int currentCutWeight, int currentSizeX,
                          std::vector<bool> assigned);
   int betterLowerBoundParallel(int startNode, int currentSizeX,
