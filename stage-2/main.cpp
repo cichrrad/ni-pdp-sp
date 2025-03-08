@@ -20,7 +20,7 @@ int main(int argc, char *argv[]) {
     // solver.printBestSolution();
 
     // improved version
-    solver.betterSolve(1);
+    solver.betterSolveParallel(1);
     solver.printBestSolution();
 
   } catch (const std::exception &e) {

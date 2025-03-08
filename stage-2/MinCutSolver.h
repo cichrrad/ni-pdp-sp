@@ -28,8 +28,10 @@ public:
 
   // Computes the cut value for a given partition.
   int computeCut(const std::vector<bool> &assignment) const;
+  void betterSolveParallel(int numRandomTries);
 
 private:
+  std::vector<long> recursionCounts;
   const Graph &graph;
   int n; // number of vertices in the graph
   int a; // required size for partition X
@@ -47,6 +49,10 @@ private:
   void parallelDfs(State state);
   void startTimer();
   void stopTimer(const char *label);
+  void betterDfsParallel(int node, int currentCutWeight, int currentSizeX,
+                         std::vector<bool> assigned);
+  int betterLowerBoundParallel(int startNode, int currentSizeX,
+                               const std::vector<bool> &assigned) const;
 };
 
 #endif // MINCUTSOLVER_H
