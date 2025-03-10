@@ -15,12 +15,7 @@ int main(int argc, char *argv[]) {
     Graph g(filename);
     MinCutSolver solver(g, subsetSize);
 
-    //'naive' (deprecated) solver
-    // solver.solve();
-    // solver.printBestSolution();
-
-    // improved version
-    solver.betterSolveParallel(1);
+    solver.betterSolveParallel(4);
     solver.printBestSolution();
 
   } catch (const std::exception &e) {

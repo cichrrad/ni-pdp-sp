@@ -19,9 +19,8 @@ MinCutSolver::MinCutSolver(const Graph &g, int subsetSize)
 
 // New parallel DFS function that carries the state as parameters.
 // Also increments a per-thread recursion counter.
-void MinCutSolver::betterDfsParallel(int node, int currentCutWeight,
-                                     int currentSizeX,
-                                     std::vector<bool> assigned) {
+void MinCutSolver::parallelDFS(int node, int currentCutWeight, int currentSizeX,
+                               std::vector<bool> assigned) {
   // Increment the counter for the current thread
   int tid = omp_get_thread_num();
   recursionCounts[tid]++;
@@ -42,7 +41,7 @@ void MinCutSolver::betterDfsParallel(int node, int currentCutWeight,
   }
 
   // Compute lower bound for the current partial solution.
-  int lb = betterLowerBoundParallel(node, currentSizeX, assigned);
+  int lb = parallelLB(node, currentSizeX, assigned);
   // Prune if the lower bound plus the current cut weight exceeds the best known
   // solution.
   if (currentCutWeight + lb >= minCutWeight) {
@@ -65,9 +64,7 @@ void MinCutSolver::betterDfsParallel(int node, int currentCutWeight,
         }
       }
 #pragma omp task firstprivate(node, newCutWeight, currentSizeX, assignedX)
-      {
-        betterDfsParallel(node + 1, newCutWeight, currentSizeX + 1, assignedX);
-      }
+      { parallelDFS(node + 1, newCutWeight, currentSizeX + 1, assignedX); }
     }
 
     // Option 2: assign node to set Y
@@ -82,7 +79,7 @@ void MinCutSolver::betterDfsParallel(int node, int currentCutWeight,
       }
     }
 #pragma omp task firstprivate(node, newCutWeightY, currentSizeX, assignedY)
-    { betterDfsParallel(node + 1, newCutWeightY, currentSizeX, assignedY); }
+    { parallelDFS(node + 1, newCutWeightY, currentSizeX, assignedY); }
 
     // Wait for both tasks to finish before returning.
 #pragma omp taskwait
@@ -98,7 +95,7 @@ void MinCutSolver::betterDfsParallel(int node, int currentCutWeight,
           currentCutWeight += graph.getEdgeWeight(i, node);
         }
       }
-      betterDfsParallel(node + 1, currentCutWeight, currentSizeX + 1, assigned);
+      parallelDFS(node + 1, currentCutWeight, currentSizeX + 1, assigned);
       // Backtrack
       currentCutWeight = oldCut;
     }
@@ -111,7 +108,7 @@ void MinCutSolver::betterDfsParallel(int node, int currentCutWeight,
         currentCutWeight += graph.getEdgeWeight(i, node);
       }
     }
-    betterDfsParallel(node + 1, currentCutWeight, currentSizeX, assigned);
+    parallelDFS(node + 1, currentCutWeight, currentSizeX, assigned);
     currentCutWeight = oldCut;
   }
 }
@@ -119,8 +116,8 @@ void MinCutSolver::betterDfsParallel(int node, int currentCutWeight,
 // Helper function: computes the lower bound based on the state passed as
 // parameters. This is analogous to betterLowerBound() but uses the provided
 // parameters.
-int MinCutSolver::betterLowerBoundParallel(
-    int startNode, int currentSizeX, const std::vector<bool> &assigned) const {
+int MinCutSolver::parallelLB(int startNode, int currentSizeX,
+                             const std::vector<bool> &assigned) const {
   int lbSum = 0;
   int remainX = a - currentSizeX;
   int remainY = (n - a) - ((startNode)-currentSizeX);
@@ -184,10 +181,10 @@ void MinCutSolver::betterSolveParallel(int numRandomTries) {
 #pragma omp single nowait
     {
       // Launch the parallel DFS starting from node 0.
-      betterDfsParallel(0, 0, 0, assigned);
+      parallelDFS(0, 0, 0, assigned);
     }
   }
-  stopTimer("Parallel DFS");
+  stopTimer("");
 
   // Aggregate per-thread recursion counts.
   long totalRecursionCalls = 0;
@@ -200,7 +197,6 @@ void MinCutSolver::betterSolveParallel(int numRandomTries) {
 // Print the best solution found.
 void MinCutSolver::printBestSolution() const {
   std::cout << "  Best Min-Cut Weight Found: " << minCutWeight << "\n";
-  std::cout << "\n";
 }
 
 // Computes the cut of a given assignment.

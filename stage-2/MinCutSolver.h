@@ -9,12 +9,8 @@ class MinCutSolver {
 public:
   MinCutSolver(const Graph &g, int subsetSize);
 
-  // The improved solver that uses parallel DFS.
-  void betterSolve(int numRandomTries);
-
   // Used to compute an initial good solution.
   void guesstimate(int numTries);
-
   // Print the best solution found.
   void printBestSolution() const;
 
@@ -38,10 +34,10 @@ private:
   void startTimer();
   void stopTimer(const char *label);
 
-  void betterDfsParallel(int node, int currentCutWeight, int currentSizeX,
-                         std::vector<bool> assigned);
-  int betterLowerBoundParallel(int startNode, int currentSizeX,
-                               const std::vector<bool> &assigned) const;
+  void parallelDFS(int node, int currentCutWeight, int currentSizeX,
+                   std::vector<bool> assigned);
+  int parallelLB(int startNode, int currentSizeX,
+                 const std::vector<bool> &assigned) const;
 };
 
 #endif // MINCUTSOLVER_H

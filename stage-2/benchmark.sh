@@ -8,7 +8,7 @@ fi
 
 GRAPH_LIST="$1"
 SOURCE_DIR="$2"
-CSV_FILE="results_reduced_guesstimate.csv"
+CSV_FILE="results.csv"
 
 # Clear CSV file and write the header
 echo "filename,partition_size,recursive_calls,time,min_cut_weight" > "$CSV_FILE"
@@ -24,7 +24,7 @@ while read -r FILENAME SIZE; do
         OUTPUT=$(./build/mincut "$GRAPH_PATH" "$SIZE")
 
         # Extract relevant information
-        RECURSIVE_CALLS=$(echo "$OUTPUT" | grep "Total Recursive Calls" | awk '{print $4}')
+        RECURSIVE_CALLS=$(echo "$OUTPUT" | grep "Total Recursion Calls" | awk '{print $4}')
         TIME=$(echo "$OUTPUT" | grep "Execution Time" | awk '{print $3}')
         MIN_CUT_WEIGHT=$(echo "$OUTPUT" | grep "Best Min-Cut Weight Found" | awk '{print $5}')
 
