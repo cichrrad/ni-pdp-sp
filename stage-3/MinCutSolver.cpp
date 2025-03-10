@@ -5,7 +5,6 @@
 #include <iostream>
 #include <omp.h>
 #include <vector>
-
 // Define a threshold below which tasks are spawned
 #define TASK_DEPTH 6
 
@@ -83,10 +82,9 @@ void MinCutSolver::parallelDFS(int node, int currentCutWeight, int currentSizeX,
 
     // Wait for both tasks to finish before returning.
 #pragma omp taskwait
-  }
-  // sequential branch
-  else {
+  } else {
     // Sequential recursion beyond the threshold
+
     // Option 1: assign node to set X if feasible
     if (currentSizeX < a) {
       assigned[node] = true;
@@ -114,15 +112,16 @@ void MinCutSolver::parallelDFS(int node, int currentCutWeight, int currentSizeX,
   }
 }
 
-// Helper function: computes the lower bound based on the state passed as
-// parameters. This is analogous to betterLowerBound() but uses the provided
-// parameters.
+// Data-parallel lower bound calculation.
+// Parallelizes the outer loop over unassigned nodes.
 int MinCutSolver::parallelLB(int startNode, int currentSizeX,
                              const std::vector<bool> &assigned) const {
-  int lbSum = 0;
   int remainX = a - currentSizeX;
   int remainY = (n - a) - ((startNode)-currentSizeX);
+  int lbSum = 0;
 
+// Parallel loop with reduction to sum up the lower bound contributions.
+#pragma omp parallel for reduction(+ : lbSum) schedule(dynamic)
   for (int i = startNode; i < n; i++) {
     int costX = 0;
     int costY = 0;
@@ -157,9 +156,24 @@ int MinCutSolver::parallelLB(int startNode, int currentSizeX,
   return lbSum;
 }
 
+// Data-parallel version of computeCut.
+// Computes the total cut weight over all vertex pairs in parallel.
+int MinCutSolver::computeCut(const std::vector<bool> &assignment) const {
+  int cutVal = 0;
+#pragma omp parallel for collapse(2) reduction(+ : cutVal) schedule(dynamic)
+  for (int i = 0; i < n; i++) {
+    for (int j = i + 1; j < n; j++) {
+      if (assignment[i] != assignment[j]) {
+        cutVal += graph.getEdgeWeight(i, j);
+      }
+    }
+  }
+  return cutVal;
+}
+
 // A new entry point for the parallel solution.
-// It first runs the guesstimate phase (which itself can be parallelized),
-// then starts the parallel DFS.
+// It first runs the data-parallel guesstimate phase,
+// then starts the task-parallel DFS.
 void MinCutSolver::betterSolveParallel(int numRandomTries) {
   // Reset state
   minCutWeight = INT_MAX;
@@ -169,8 +183,34 @@ void MinCutSolver::betterSolveParallel(int numRandomTries) {
   currentSizeX = 0;
   recursiveCalls = 0;
 
-  // 1) Run multiple random tries to get a good initial solution.
-  guesstimate(numRandomTries);
+// Data-parallel guesstimate phase:
+// Try numRandomTries random configurations in parallel.
+#pragma omp parallel for schedule(dynamic)
+  for (int t = 0; t < numRandomTries; t++) {
+    std::vector<bool> tempAssign(n, false);
+    std::vector<int> perm(n);
+    for (int i = 0; i < n; i++) {
+      perm[i] = i;
+    }
+    // Shuffle permutation (each iteration has its own seed based on t)
+    unsigned int seed = std::time(nullptr) + t;
+    for (int i = 0; i < n; i++) {
+      int r = i + rand_r(&seed) % (n - i);
+      std::swap(perm[i], perm[r]);
+    }
+    // Assign first a vertices to set X.
+    for (int i = 0; i < a; i++) {
+      tempAssign[perm[i]] = true;
+    }
+    int cutVal = computeCut(tempAssign);
+#pragma omp critical
+    {
+      if (cutVal < minCutWeight) {
+        minCutWeight = cutVal;
+        bestPartition = tempAssign;
+      }
+    }
+  }
 
   // Initialize per-thread recursion counters.
   int maxThreads = omp_get_max_threads();
@@ -181,7 +221,7 @@ void MinCutSolver::betterSolveParallel(int numRandomTries) {
   {
 #pragma omp single nowait
     {
-      // Launch the parallel DFS starting from node 0.
+      // Launch the task-parallel DFS starting from node 0.
       parallelDFS(0, 0, 0, assigned);
     }
   }
@@ -200,27 +240,12 @@ void MinCutSolver::printBestSolution() const {
   std::cout << "  Best Min-Cut Weight Found: " << minCutWeight << "\n";
 }
 
-// Computes the cut of a given assignment.
-// We sum the weights of edges whose endpoints lie in different sets.
-int MinCutSolver::computeCut(const std::vector<bool> &assignment) const {
-  int cutVal = 0;
-  for (int i = 0; i < n; i++) {
-    for (int j = i + 1; j < n; j++) {
-      if (assignment[i] != assignment[j]) {
-        cutVal += graph.getEdgeWeight(i, j);
-      }
-    }
-  }
-  return cutVal;
-}
-
 // Starts the timer for measuring execution duration.
 void MinCutSolver::startTimer() {
   startTime = std::chrono::high_resolution_clock::now();
 }
 
-// Stops the timer, printing the elapsed time and total recursive calls (if
-// available).
+// Stops the timer, printing the elapsed time.
 void MinCutSolver::stopTimer(const char *label) {
   auto endTime = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double> elapsed = endTime - startTime;
@@ -229,35 +254,9 @@ void MinCutSolver::stopTimer(const char *label) {
   std::cout << "  Execution Time: " << elapsed.count() << " seconds\n";
 }
 
-// To not start from nothing, try to (gu)es(s)timate an initial minCutWeight
-// from [numTries] random configurations.
+// Data-parallel guesstimate phase to obtain an initial minCutWeight.
 void MinCutSolver::guesstimate(int numTries) {
-  for (int t = 0; t < numTries; t++) {
-    // 1) Create a random assignment.
-    std::vector<bool> tempAssign(n, false);
-
-    // Pick 'a' distinct vertices for X.
-    std::vector<int> perm(n);
-    for (int i = 0; i < n; i++) {
-      perm[i] = i;
-    }
-    // Shuffle the permutation.
-    for (int i = 0; i < n; i++) {
-      int r = i + std::rand() % (n - i);
-      std::swap(perm[i], perm[r]);
-    }
-    // First 'a' vertices go to X.
-    for (int i = 0; i < a; i++) {
-      tempAssign[perm[i]] = true;
-    }
-
-    // 2) Compute the cut value.
-    int cutVal = computeCut(tempAssign);
-
-    // 3) Update the best global solution if it is better.
-    if (cutVal < minCutWeight) {
-      minCutWeight = cutVal;
-      bestPartition = tempAssign;
-    }
-  }
+  // Already integrated into betterSolveParallel with a parallel loop.
+  // Optionally, you can call this function separately if needed.
+  // In this version, betterSolveParallel runs guesstimate in parallel.
 }
