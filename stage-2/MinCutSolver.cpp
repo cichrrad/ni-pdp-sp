@@ -9,7 +9,6 @@
 // Define a threshold below which tasks are spawned
 #define TASK_DEPTH 6
 
-// Constructor: Initializes state and seeds the random number generator.
 MinCutSolver::MinCutSolver(const Graph &g, int subsetSize)
     : graph(g), n(g.getNumVertices()), a(subsetSize), minCutWeight(INT_MAX),
       assigned(n, false), bestPartition(n, false), currentCutWeight(0),
@@ -17,11 +16,10 @@ MinCutSolver::MinCutSolver(const Graph &g, int subsetSize)
   std::srand((unsigned)std::time(nullptr));
 }
 
-// New parallel DFS function that carries the state as parameters.
-// Also increments a per-thread recursion counter.
 void MinCutSolver::parallelDFS(int node, int currentCutWeight, int currentSizeX,
                                std::vector<bool> assigned) {
-  // Increment the counter for the current thread
+  // each thread updates its own recursion count in a vector
+  // --> then sum up at the end
   int tid = omp_get_thread_num();
   recursionCounts[tid]++;
 
@@ -29,11 +27,14 @@ void MinCutSolver::parallelDFS(int node, int currentCutWeight, int currentSizeX,
   if (node == n) {
     if (currentSizeX == a) {
       // Critical section to update the global best solution
+      // if before critical could prevent wasteful syncs?
+      if (currentCutWeight < minCutWeight) {
 #pragma omp critical
-      {
-        if (currentCutWeight < minCutWeight) {
-          minCutWeight = currentCutWeight;
-          bestPartition = assigned;
+        {
+          if (currentCutWeight < minCutWeight) {
+            minCutWeight = currentCutWeight;
+            bestPartition = assigned;
+          }
         }
       }
     }
@@ -158,8 +159,6 @@ int MinCutSolver::parallelLB(int startNode, int currentSizeX,
 }
 
 // A new entry point for the parallel solution.
-// It first runs the guesstimate phase (which itself can be parallelized),
-// then starts the parallel DFS.
 void MinCutSolver::betterSolveParallel(int numRandomTries) {
   // Reset state
   minCutWeight = INT_MAX;
