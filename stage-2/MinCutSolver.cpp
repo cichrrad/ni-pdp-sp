@@ -49,70 +49,38 @@ void MinCutSolver::parallelDFS(int node, int currentCutWeight, int currentSizeX,
     return;
   }
 
-  // Spawn tasks at the upper levels of the DFS; switch to sequential recursion
-  // after TASK_DEPTH.
-  if (node < TASK_DEPTH) {
-    // Option 1: assign node to set X if feasible
-    if (currentSizeX < a) {
-      std::vector<bool> assignedX = assigned;
-      assignedX[node] = true;
-      int newCutWeight = currentCutWeight;
-      // Update newCutWeight for assigning node to X: add weights from all nodes
-      // in Y
-      for (int i = 0; i < node; i++) {
-        if (!assignedX[i]) {
-          newCutWeight += graph.getEdgeWeight(i, node);
-        }
-      }
-#pragma omp task firstprivate(node, newCutWeight, currentSizeX, assignedX)
-      { parallelDFS(node + 1, newCutWeight, currentSizeX + 1, assignedX); }
-    }
-
-    // Option 2: assign node to set Y
-    std::vector<bool> assignedY = assigned;
-    assignedY[node] = false;
-    int newCutWeightY = currentCutWeight;
-    // Update newCutWeight for assigning node to Y: add weights from all nodes
-    // in X
+  // Option 1: assign node to set X if feasible
+  if (currentSizeX < a) {
+    std::vector<bool> assignedX = assigned;
+    assignedX[node] = true;
+    int newCutWeight = currentCutWeight;
+    // Update newCutWeight for assigning node to X: add weights from all nodes
+    // in Y
     for (int i = 0; i < node; i++) {
-      if (assigned[i]) {
-        newCutWeightY += graph.getEdgeWeight(i, node);
+      if (!assignedX[i]) {
+        newCutWeight += graph.getEdgeWeight(i, node);
       }
     }
-#pragma omp task firstprivate(node, newCutWeightY, currentSizeX, assignedY)
-    { parallelDFS(node + 1, newCutWeightY, currentSizeX, assignedY); }
+#pragma omp task firstprivate(node, newCutWeight, currentSizeX,                \
+                                  assignedX) if (node < TASK_DEPTH)
+    { parallelDFS(node + 1, newCutWeight, currentSizeX + 1, assignedX); }
+  }
 
-    // Wait for both tasks to finish before returning.
+  // Option 2: assign node to set Y
+  std::vector<bool> assignedY = assigned;
+  assignedY[node] = false;
+  int newCutWeightY = currentCutWeight;
+  // Update newCutWeight for assigning node to Y: add weights from all nodes
+  // in X
+  for (int i = 0; i < node; i++) {
+    if (assigned[i]) {
+      newCutWeightY += graph.getEdgeWeight(i, node);
+    }
+  }
+  parallelDFS(node + 1, newCutWeightY, currentSizeX, assignedY);
+
+  // Wait for both tasks to finish before returning.
 #pragma omp taskwait
-  }
-  // sequential branch
-  else {
-    // Sequential recursion beyond the threshold
-    // Option 1: assign node to set X if feasible
-    if (currentSizeX < a) {
-      assigned[node] = true;
-      int oldCut = currentCutWeight;
-      for (int i = 0; i < node; i++) {
-        if (!assigned[i]) {
-          currentCutWeight += graph.getEdgeWeight(i, node);
-        }
-      }
-      parallelDFS(node + 1, currentCutWeight, currentSizeX + 1, assigned);
-      // Backtrack
-      currentCutWeight = oldCut;
-    }
-
-    // Option 2: assign node to set Y
-    assigned[node] = false;
-    int oldCut = currentCutWeight;
-    for (int i = 0; i < node; i++) {
-      if (assigned[i]) {
-        currentCutWeight += graph.getEdgeWeight(i, node);
-      }
-    }
-    parallelDFS(node + 1, currentCutWeight, currentSizeX, assigned);
-    currentCutWeight = oldCut;
-  }
 }
 
 // Helper function: computes the lower bound based on the state passed as
