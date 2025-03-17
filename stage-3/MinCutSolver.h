@@ -15,8 +15,18 @@ public:
   void printBestSolution() const;
 
   void betterSolveParallel(int numRandomTries);
+  // void betterSolveParallelMS(int numRandomTries, int frontierDepth);
+  void betterSolveParallelMSDynamic(int numRandomTries, int frontierDepth);
 
 private:
+  // --- Structure to store a partial solution ---
+  struct PartialSolution {
+    int node;                   // next node index to assign
+    int currentCutWeight;       // cut weight so far
+    int currentSizeX;           // how many vertices are in set X so far
+    std::vector<bool> assigned; // current assignment state for all vertices
+  };
+
   std::vector<long> recursionCounts;
   const Graph &graph;
   int n; // number of vertices in the graph
@@ -38,6 +48,13 @@ private:
                    std::vector<bool> assigned);
   int parallelLB(int startNode, int currentSizeX,
                  const std::vector<bool> &assigned) const;
+  void dfsSequential(int node, int currentCutWeight, int currentSizeX,
+                     std::vector<bool> &assigned);
+  void generatePartialSolutions(int node, int currentCutWeight,
+                                int currentSizeX,
+                                const std::vector<bool> &assigned,
+                                int frontierDepth,
+                                std::vector<PartialSolution> &solutions);
 };
 
 #endif // MINCUTSOLVER_H
