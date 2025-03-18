@@ -13,8 +13,8 @@ public:
   int getEdgeWeight(int i, int j) const;
 
 private:
-  int n = 0;                                     // size
-  std::vector<std::vector<int>> adjacencyMatrix; // representation
+  int n = 0;               // number of vertices
+  std::vector<int> matrix; // flattened adjacency matrix in row-major order
 };
 
 #endif // GRAPH_H
