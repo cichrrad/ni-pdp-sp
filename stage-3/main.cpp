@@ -15,7 +15,7 @@ int main(int argc, char *argv[]) {
     Graph g(filename);
     MinCutSolver solver(g, subsetSize);
 
-    solver.betterSolveParallelMSDynamic(20, 10);
+    solver.betterSolveParallelMS(10, 10);
     solver.printBestSolution();
 
   } catch (const std::exception &e) {

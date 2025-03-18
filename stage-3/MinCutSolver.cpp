@@ -1,16 +1,10 @@
 #include "MinCutSolver.h"
 #include <algorithm>
-#include <atomic>
-#include <boost/lockfree/queue.hpp>
 #include <climits>
-#include <condition_variable>
 #include <cstdlib>
 #include <ctime>
 #include <iostream>
-#include <mutex>
 #include <omp.h>
-#include <queue>
-#include <thread>
 #include <vector>
 
 // --- Constructor ---
@@ -73,7 +67,8 @@ void MinCutSolver::dfsSequential(int node, int currentCutWeight,
 }
 
 // --- Generate Partial Solutions ---
-// Expand the DFS tree up to frontierDepth.
+// Expand the DFS tree up to a given frontierDepth. All generated partial
+// solutions are stored in 'solutions'.
 void MinCutSolver::generatePartialSolutions(
     int node, int currentCutWeight, int currentSizeX,
     const std::vector<bool> &assigned, int frontierDepth,
@@ -83,7 +78,7 @@ void MinCutSolver::generatePartialSolutions(
     ps.node = node;
     ps.currentCutWeight = currentCutWeight;
     ps.currentSizeX = currentSizeX;
-    ps.assigned = assigned;
+    ps.assigned = assigned; // copy assignment vector
     solutions.push_back(ps);
     return;
   }
@@ -112,11 +107,12 @@ void MinCutSolver::generatePartialSolutions(
                            frontierDepth, solutions);
 }
 
-// --- Dynamic Master-Slave with Boost Lock-Free Queue ---
-// Producer generates partial solutions, sorts them, and pushes them into the
-// queue.
-void MinCutSolver::betterSolveParallelMSDynamic(int numRandomTries,
-                                                int frontierDepth) {
+// --- Dynamic Master-Slave Entry Point (Static Partial Solutions) ---
+// Instead of dynamically generating work with a lock-free queue,
+// we generate all partial solutions up front (which is acceptable for n < 100)
+// and then process them in parallel.
+void MinCutSolver::betterSolveParallelMS(int numRandomTries,
+                                         int frontierDepth) {
   // Reset state.
   minCutWeight = INT_MAX;
   std::fill(assigned.begin(), assigned.end(), false);
@@ -125,60 +121,37 @@ void MinCutSolver::betterSolveParallelMSDynamic(int numRandomTries,
   currentSizeX = 0;
   recursiveCalls = 0;
 
-  // 1) Guesstimate phase.
+  // 1) Run the guesstimate phase.
   guesstimate(numRandomTries);
 
-  // Create a Boost lock-free queue with a fixed capacity.
-  boost::lockfree::queue<PartialSolution *> workQueue(1024);
-  std::atomic<bool> producerDone(false);
+  // 2) Generate partial solutions up to the given frontier depth.
+  std::vector<PartialSolution> partialSolutions;
+  std::vector<bool> initAssign(n, false);
+  generatePartialSolutions(0, 0, 0, initAssign, frontierDepth,
+                           partialSolutions);
+  std::cout << "Generated " << partialSolutions.size()
+            << " partial solutions.\n";
 
-  // Producer lambda.
-  auto producer = [&]() {
-    std::vector<bool> initAssign(n, false);
-    std::vector<PartialSolution> solutions;
-    generatePartialSolutions(0, 0, 0, initAssign, frontierDepth, solutions);
-    // Sort partial solutions: most promising (lower cut weight) first.
-    std::sort(solutions.begin(), solutions.end(),
-              [](const PartialSolution &a, const PartialSolution &b) {
-                return a.currentCutWeight < b.currentCutWeight;
-              });
-    for (auto &sol : solutions) {
-      PartialSolution *pSol = new PartialSolution(sol);
-      while (!workQueue.push(pSol)) {
-        std::this_thread::yield();
-      }
-    }
-    producerDone.store(true);
-  };
-
-  std::thread producerThread(producer);
-
+  // 3) Initialize per-thread recursion counters.
   int maxThreads = omp_get_max_threads();
   recursionCounts.assign(maxThreads, 0);
 
+  // 4) Start the timer.
   startTimer();
 
-#pragma omp parallel
-  {
-    while (true) {
-      PartialSolution *ps = nullptr;
-      if (workQueue.pop(ps)) {
-        std::vector<bool> localAssign = ps->assigned;
-        dfsSequential(ps->node, ps->currentCutWeight, ps->currentSizeX,
-                      localAssign);
-        delete ps;
-      } else {
-        if (producerDone.load() && workQueue.empty())
-          break;
-        std::this_thread::yield();
-      }
-    }
+  // 5) Process each partial solution in parallel.
+#pragma omp parallel for schedule(dynamic)
+  for (size_t i = 0; i < partialSolutions.size(); i++) {
+    std::vector<bool> localAssign = partialSolutions[i].assigned;
+    dfsSequential(partialSolutions[i].node,
+                  partialSolutions[i].currentCutWeight,
+                  partialSolutions[i].currentSizeX, localAssign);
   }
 
-  stopTimer("Dynamic Master-Slave DFS (Lock-Free Queue)");
+  // 6) Stop the timer.
+  stopTimer("Static Master-Slave DFS");
 
-  producerThread.join();
-
+  // 7) Aggregate per-thread recursion counts.
   long totalRecursionCalls = 0;
   for (auto count : recursionCounts)
     totalRecursionCalls += count;
@@ -186,10 +159,42 @@ void MinCutSolver::betterSolveParallelMSDynamic(int numRandomTries,
 }
 
 // --- Optimized Parallel Lower Bound (LB) ---
-// Uses OpenMP parallel for reduction.
+// Uses OpenMP parallel for reduction. For small ranges, this might be
+// sequential.
 int MinCutSolver::parallelLB(int startNode, int currentSizeX,
                              const std::vector<bool> &assigned) const {
+  int range = n - startNode;
   int lbSum = 0;
+  // Use sequential computation for very small ranges.
+  if (range < 100) {
+    for (int i = startNode; i < n; i++) {
+      int costX = 0, costY = 0;
+      int remainX = a - currentSizeX;
+      int remainY = (n - a) - ((startNode)-currentSizeX);
+      if (remainX > 0) {
+        for (int j = 0; j < i; j++) {
+          if (!assigned[j])
+            costX += graph.getEdgeWeight(i, j);
+        }
+      } else {
+        costX = INT_MAX;
+      }
+      if (remainY > 0) {
+        for (int j = 0; j < i; j++) {
+          if (assigned[j])
+            costY += graph.getEdgeWeight(i, j);
+        }
+      } else {
+        costY = INT_MAX;
+      }
+      int best = (costX < costY) ? costX : costY;
+      if (best == INT_MAX)
+        best = 0;
+      lbSum += best;
+    }
+    return lbSum;
+  }
+  // Otherwise, use parallel for reduction.
   int remainX = a - currentSizeX;
   int remainY = (n - a) - ((startNode)-currentSizeX);
 #pragma omp parallel for reduction(+ : lbSum) schedule(dynamic)
