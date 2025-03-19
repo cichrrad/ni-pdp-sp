@@ -1,5 +1,6 @@
 #include "Graph.h"
 #include "MinCutSolver.h"
+#include <algorithm> // for std::min
 #include <iostream>
 
 int main(int argc, char *argv[]) {
@@ -13,9 +14,14 @@ int main(int argc, char *argv[]) {
 
   try {
     Graph g(filename);
+    // Heuristic: frontierDepth = min(a , 16)
+    int frontierDepth = std::min(subsetSize, 16);
+    // std::cout << "Using frontierDepth = " << frontierDepth << "\n";
+
     MinCutSolver solver(g, subsetSize);
 
-    solver.betterSolveParallelMS(10, 10);
+    // Use the static master-slave entry point (for small graphs)
+    solver.betterSolveParallelMS(4, frontierDepth);
     solver.printBestSolution();
 
   } catch (const std::exception &e) {

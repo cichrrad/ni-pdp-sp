@@ -124,20 +124,18 @@ void MinCutSolver::betterSolveParallelMS(int numRandomTries,
   // 1) Run the guesstimate phase.
   guesstimate(numRandomTries);
 
+  startTimer();
   // 2) Generate partial solutions up to the given frontier depth.
   std::vector<PartialSolution> partialSolutions;
   std::vector<bool> initAssign(n, false);
   generatePartialSolutions(0, 0, 0, initAssign, frontierDepth,
                            partialSolutions);
-  std::cout << "Generated " << partialSolutions.size()
-            << " partial solutions.\n";
+  // std::cout << "Generated " << partialSolutions.size()
+  //           << " partial solutions.\n";
 
   // 3) Initialize per-thread recursion counters.
   int maxThreads = omp_get_max_threads();
   recursionCounts.assign(maxThreads, 0);
-
-  // 4) Start the timer.
-  startTimer();
 
   // 5) Process each partial solution in parallel.
 #pragma omp parallel for schedule(dynamic)
@@ -149,7 +147,7 @@ void MinCutSolver::betterSolveParallelMS(int numRandomTries,
   }
 
   // 6) Stop the timer.
-  stopTimer("Static Master-Slave DFS");
+  stopTimer("");
 
   // 7) Aggregate per-thread recursion counts.
   long totalRecursionCalls = 0;
