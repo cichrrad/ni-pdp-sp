@@ -3,7 +3,7 @@
 
 Úvodní fází řešení úlohy bylo vytvoření sekvenční verze algoritmu pro nalezení minimálního hranového řezu mezi dvěma disjunktními podmnožinami uzlů pevně zadané velikosti. Hledání optimálního rozdělení bylo realizováno pomocí algoritmu typu **Branch-and-Bound s prohledáváním do hloubky (BB-DFS)**, který systematicky prochází možné konfigurace a současně efektivně ořezává výpočetní prostor na základě odhadované dolní meze.
 
-Graf je reprezentován jako **matice sousednosti** pomocí struktury `std::vector<std::vector<int>>`. Tento přístup umožňuje rychlý přístup k váhám hran mezi libovolnými dvojicemi uzlů. Reprezentace byla dostatečně efektivní pro všechny fáze řešení až do paralelizace pomocí MPI, kde byla kvůli přenositelnosti mezi procesy převedena na lineární formu.
+Graf je reprezentován jako **matice sousednosti** pomocí struktury `std::vector<std::vector<int>>`. Tento přístup umožňuje rychlý přístup k váhám hran mezi libovolnými dvojicemi uzlů.
 
 #### Optimalizace
 
@@ -42,3 +42,33 @@ Další zajímavostí je řešení problému sledování celkového počtu rekur
 Paralelizace vedla k dalšímu zrychlení výpočtu, a to i u instancí, kde již sekvenční verze dosahovala velmi dobrých výsledků. Výrazné zlepšení je patrné zejména u větších grafů a náročnějších hodnot parametru \( a \), kde dochází k masivnímu větvení stavového prostoru. Současné zpracování více větví umožňuje rychleji nalézt kvalitní řešení a efektivněji provádět ořezávání.
     
 **[TODO – tabulka s výsledky paralelní verze]**
+
+---
+
+### **3. Paralelizace pomocí OpenMP – data-paralelní přístup**
+
+Ve třetí fázi byla implementace rozšířena o **data-paralelní zpracování**, které navazuje na předchozí task-based verzi. Cílem bylo dosáhnout dalšího zrychlení výpočtu prostřednictvím zpracování více nezávislých výpočetních jednotek ve větší míře najednou, především mimo samotnou rekurzi.
+
+#### Struktura řešení
+
+Zásadní změnou oproti předchozímu přístupu bylo zavedení **frontier-based strategie**, při níž se stavový prostor algoritmu předem „rozřeže“ na menší části. Konkrétně je pomocí funkce `generatePartialSolutions` vygenerována množina částečných konfigurací až do předem dané hloubky (`frontierDepth`). Každá z těchto konfigurací představuje alternativní výchozí stav pro další průchod rekurzivním BB-DFS algoritmem.
+
+Následně je tato množina částečných řešení zpracována paralelně pomocí direktivy `#pragma omp parallel for`. Každý thread tak pracuje nezávisle na jiné části stavového prostoru, což umožňuje lepší využití výpočetních prostředků při současném zachování determinismu výpočtu.
+
+Výpočet dolní meze (`parallelLB`) byl rovněž upraven: pro malé rozsahy je nadále zpracováván sekvenčně, zatímco pro větší vstupy se aktivuje paralelní verze založená na `#pragma omp for reduction`, čímž se dosahuje úspory času zejména u rozsáhlejších grafů.
+
+#### Praktické poznámky
+
+Hodnota `frontierDepth` byla zvolena jednoduše jako minimum mezi velikostí požadované podmnožiny \( a \) a konstantou 16. Vzhledem k omezenému rozsahu projektu nebylo nutné její hodnotu detailně ladit – šlo o rozumný kompromis mezi granularitou paralelismu a režijní náročností generování počátečních konfigurací.
+
+Dynamické rozdělování úloh pomocí fronty nebylo zavedeno – především z důvodu jednoduchosti implementace a časových omezení v rámci jiných studijních povinností. V praxi se ukázalo, že rozdělení prostřednictvím `omp for` je dostatečně efektivní a nevedlo k zásadním problémům s nerovnoměrným vytížením threadů. Vzhledem k tomu, že jednotlivé částečné konfigurace měly podobnou výpočetní náročnost, nebylo třeba dále řešit adaptivní plánování nebo přenos úloh mezi vlákny.
+
+Uvažována byla rovněž možnost převést rekurzivní DFS na iterativní variantu, což by mohlo přinést zlepšení z hlediska cache locality nebo jednodušší správu paralelismu. Tento směr však nebyl v této fázi realizován a zůstává otevřeným tématem pro případné budoucí rozšíření.
+
+#### Výsledky
+
+Data-paralelní přístup přinesl další zrychlení výpočtu ve srovnání s předchozí task-based verzí, i když rozdíl nebyl tak výrazný jako při přechodu ze sekvenční verze. Významný přínos je patrný u středně velkých grafů, kde počet částečných konfigurací umožňuje dostatečně rovnoměrné rozdělení práce mezi vlákna bez výrazné režijní zátěže.
+
+**[TODO – tabulka s výsledky data-paralelní verze]**
+
+---
