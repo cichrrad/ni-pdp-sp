@@ -128,8 +128,6 @@ public:
   }
 
   // --- New: OpenMP-parallel DFS routine ---
-  // This DFS uses OpenMP tasks to explore branches concurrently.
-  // The parameters mirror the sequential DFS.
   void dfsParallel(int node, int currentCutWeight, int currentSizeX,
                    const std::vector<bool> &assigned, int &localBestCut,
                    std::vector<bool> &localBestPartition, long &recCalls) {

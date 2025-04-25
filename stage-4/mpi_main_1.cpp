@@ -40,8 +40,7 @@ public:
 
 //---------------------------------------------------------------------
 // PartialSolution used for task distribution.
-// Note: This structure is “packed” into an MPI message.
-// We now add an extra integer (globalBound) to provide the current best cut.
+// whole struct is broadcasted
 struct PartialSolution {
   int node;                   // next node to assign
   int currentCutWeight;       // computed cut weight so far
@@ -50,7 +49,6 @@ struct PartialSolution {
   std::vector<bool> assigned; // assignment vector (true means in X)
 };
 
-// Utility: convert vector<bool> to vector<int> (1 for true, 0 for false)
 std::vector<int> boolVectorToIntVector(const std::vector<bool> &v) {
   std::vector<int> res(v.size(), 0);
   for (size_t i = 0; i < v.size(); i++)
@@ -58,7 +56,6 @@ std::vector<int> boolVectorToIntVector(const std::vector<bool> &v) {
   return res;
 }
 
-// Utility: convert vector<int> to vector<bool>
 std::vector<bool> intVectorToBoolVector(const std::vector<int> &v) {
   std::vector<bool> res(v.size(), false);
   for (size_t i = 0; i < v.size(); i++)
@@ -124,9 +121,6 @@ public:
     return lbSum;
   }
 
-  // --- New: OpenMP-parallel DFS routine ---
-  // This DFS uses OpenMP tasks to explore branches concurrently.
-  // The parameters mirror the sequential DFS.
   void dfsParallel(int node, int currentCutWeight, int currentSizeX,
                    const std::vector<bool> &assigned, int &localBestCut,
                    std::vector<bool> &localBestPartition, long &recCalls) {
@@ -256,7 +250,6 @@ public:
 };
 
 //---------------------------------------------------------------------
-// Main: MPI master-worker solver that distributes DFS tasks.
 int main(int argc, char *argv[]) {
   MPI_Init(&argc, &argv);
 
@@ -289,7 +282,7 @@ int main(int argc, char *argv[]) {
       fin >> flatMatrix[i];
     }
   }
-  // Broadcast n and the graph data to all processes.
+  // Broadcast n and the graph data
   MPI_Bcast(&n, 1, MPI_INT, 0, MPI_COMM_WORLD);
   if (rank != 0) {
     flatMatrix.resize(n * n);
@@ -297,7 +290,6 @@ int main(int argc, char *argv[]) {
   MPI_Bcast(flatMatrix.data(), n * n, MPI_INT, 0, MPI_COMM_WORLD);
   graph = new Graph(n, flatMatrix);
 
-  // Choose a frontier depth for generating partial tasks.
   int frontierDepth = std::min(subsetSize, 16);
 
   if (rank == 0) {
@@ -316,8 +308,7 @@ int main(int argc, char *argv[]) {
     auto startTime = std::chrono::high_resolution_clock::now();
 
     // Initially send one task to each worker.
-    // We now pack an extra integer (globalBound) so that buffer size is 4+n
-    // ints.
+    // size of payload -- 4 + n
     for (int dest = 1; dest < nProcs; dest++) {
       if (tasksSent < totalTasks) {
         tasks[tasksSent].globalBound = globalBestCut;
